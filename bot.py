@@ -234,6 +234,8 @@ BTN_RATE = "📊 Today's Rate"
 BTN_ORDERS = "📜 My Orders"
 BTN_SUPPORT = "👨‍💼 Support"
 BTN_GRAM = "💎 Gram"
+BTN_BUY_GRAM = "💎 Buy Gram"
+BTN_SELL_GRAM = "💎 Sell Gram"
 BTN_ADMIN = "⚙️ 👑 Admin Panel"
 BTN_CANCEL = "🔴 ❌ Cancel Action"
 
@@ -243,8 +245,8 @@ def main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     # like the SMM bot main menu. Inline buttons are intentionally untouched.
     rows = [
         [_mkb(BTN_BUY, "primary"), _mkb(BTN_SELL, "success")],
+        [_mkb(BTN_BUY_GRAM, "primary"), _mkb(BTN_SELL_GRAM, "success")],
         [_mkb(BTN_RATE, "primary"), _mkb(BTN_ORDERS, "success")],
-        [_mkb(BTN_GRAM, "success")],
     ]
     if is_admin(user_id):
         rows.append([_mkb(BTN_SUPPORT, "primary"), _mkb(BTN_ADMIN, "primary")])
@@ -448,6 +450,34 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if text == BTN_ADMIN:
         await cmd_admin(update, context)
+        return
+    if text in (BTN_BUY_GRAM, BTN_SELL_GRAM):
+        is_buy = text == BTN_BUY_GRAM
+        order_type = "BUY" if is_buy else "SELL"
+        rate = float(get_setting("gram_buy_rate" if is_buy else "gram_sell_rate"))
+        min_usd = float(get_setting("min_usd"))
+        max_usd = float(get_setting("max_usd"))
+        reserve = float(get_setting("gram_reserve"))
+        user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "GRAM"}
+        if is_buy:
+            prompt = (
+                "🟢 💎 <b>Buy Gram</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💠 <b>আজকের কেনার রেট:</b> <code>{rate} BDT / Gram</code>\n"
+                f"💎 <b>আমাদের রিজার্ভ:</b> <code>{reserve} Gram</code>\n"
+                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} Gram</code>\n\n"
+                "✍️ <b>আপনি কত Gram কিনতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 25):</b>"
+            )
+        else:
+            prompt = (
+                "🔴 💎 <b>Sell Gram</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💠 <b>আজকের বিক্রির রেট:</b> <code>{rate} BDT / Gram</code>\n"
+                f"📉 Minimum gram sell: <code>{min_usd} Gram</code>\n"
+                f"📈 Maximum gram sell: <code>{max_usd} Gram</code>\n\n"
+                "✍️ <b>আপনি কত Gram বিক্রি করতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 50):</b>"
+            )
+        await message.reply_text(prompt, reply_markup=cancel_keyboard())
         return
     if text == BTN_GRAM:
         await message.reply_text(
