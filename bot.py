@@ -72,7 +72,7 @@ user_states = {}
 # DATABASE SETUP & HELPER FUNCTIONS (same schema/defaults as source)
 # ====================================================================
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     c.execute(
         """
@@ -152,7 +152,8 @@ def init_db():
         "bep20_address": "Not Set - BEP20 Address",
         "gram_address": "Not Set - Gram Address",
         "support_user": "@YourSupportUsername",
-        "notice_text": "⚡ ১০০% ট্রাস্টেড ও দ্রুত Binance USDT Buy-Sell সার্ভিস। অর্ডার করার ৫-১০ মিনিটের মধ্যে ডেলিভারি পাবেন।",
+        "force_channel": "",
+        "notice_text": "⚡ ১০০% ট্রাস্টেড ও দ্রুত Binance USDT Buy-Sell সার্ভিস। অর্ডার করার ৫-৩০ মিনিটের মধ্যে ডেলিভারি পাবেন।",
     }
     for k, v in default_settings.items():
         c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
@@ -167,7 +168,7 @@ def init_db():
 
 
 def get_setting(key: str) -> str:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     c.execute("SELECT value FROM settings WHERE key = ?", (key,))
     row = c.fetchone()
@@ -176,7 +177,7 @@ def get_setting(key: str) -> str:
 
 
 def set_setting(key: str, value: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
     conn.commit()
@@ -184,7 +185,7 @@ def set_setting(key: str, value: str):
 
 
 def register_user(user):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     username = f"@{user.username}" if user.username else "NoUsername"
     full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
@@ -206,7 +207,7 @@ def register_user(user):
 def is_admin(user_id: int) -> bool:
     if MAIN_ADMIN_ID and user_id == MAIN_ADMIN_ID:
         return True
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     c.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
     row = c.fetchone()
@@ -215,7 +216,7 @@ def is_admin(user_id: int) -> bool:
 
 
 def get_all_admin_ids():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     c.execute("SELECT user_id FROM users WHERE is_admin = 1")
     ids = [r[0] for r in c.fetchall()]
@@ -359,6 +360,7 @@ def bot_setting_markup() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(f"🤖 Bot Status: {bot_st} (Click to Toggle)", callback_data="adm_toggle_bot")],
         [InlineKeyboardButton("📞 Set Support ID", callback_data="adm_set_support"),
          InlineKeyboardButton("📢 Set Notice Text", callback_data="adm_set_notice")],
+        [InlineKeyboardButton("📢 Set Force Channel", callback_data="adm_set_force_channel")],
         [InlineKeyboardButton("➕ Add Admin ID", callback_data="adm_add_admin"),
          InlineKeyboardButton("📣 Broadcast Msg", callback_data="adm_broadcast")],
         [InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="adm_back_admin")],
@@ -367,7 +369,7 @@ def bot_setting_markup() -> InlineKeyboardMarkup:
 
 def get_admin_dashboard_text() -> str:
     bot_st = "🟢 ACTIVE" if get_setting("bot_active") == "1" else "🔴 OFF (Maintenance)"
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0]
@@ -434,7 +436,8 @@ def get_bot_setting_text() -> str:
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🤖 <b>Bot Status:</b> {bot_st}\n"
         f"📞 <b>Support:</b> {get_setting('support_user')}\n"
-        f"📢 <b>Notice:</b> {get_setting('notice_text')}"
+        f"📢 <b>Notice:</b> {get_setting('notice_text')}\n"
+        f"📢 <b>Force Channel:</b> {', '.join('@' + c for c in _force_channels()) if _force_channels() else 'OFF'}"
     )
 
 
@@ -478,9 +481,50 @@ def build_rate_card() -> str:
 # ====================================================================
 # START & ADMIN COMMANDS
 # ====================================================================
+def _force_channels() -> list:
+    """Force channels, unlimited, stored comma-separated, @ stripped."""
+    out = []
+    for part in get_setting("force_channel").replace(",", " ").split():
+        name = part.strip().lstrip("@")
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+async def _force_gate_blocked(context, uid: int) -> list:
+    """Return list of channels the user still has to join (empty = pass).
+    Admins exempt. Fail-open per channel: if membership cannot be checked
+    (bot not admin of that channel, bad channel), that channel does NOT block."""
+    if is_admin(uid):
+        return []
+    blocked = []
+    for ch in _force_channels():
+        try:
+            m = await context.bot.get_chat_member(f"@{ch}", uid)
+            if m.status in ("member", "administrator", "creator"):
+                continue
+        except Exception:
+            continue
+        blocked.append(ch)
+    return blocked
+
+
+def _force_gate_markup(ch_list: list) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(f"📢 Join @{ch}", url=f"https://t.me/{ch}")] for ch in ch_list]
+    rows.append([InlineKeyboardButton("✅ আমি Join করেছি", callback_data="force_check")])
+    return InlineKeyboardMarkup(rows)
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_user(update.effective_user)
     user_states.pop(update.effective_user.id, None)
+    _blocked_list = await _force_gate_blocked(context, update.effective_user.id)
+    if _blocked_list:
+        await update.message.reply_text(
+            "📢 <b>আগে আমাদের চ্যানেলগুলোতে Join করুন</b>\n\nবট ব্যবহার করতে হলে নিচের সব চ্যানেলে Join করতে হবে। Join করে নিচের ✅ বাটন চাপুন।",
+            reply_markup=_force_gate_markup(_blocked_list),
+        )
+        return
     welcome_text = (
         f"👋 <b>স্বাগতম {update.effective_user.first_name}!</b>\n"
         "💎 <b>Binance Dollar (USDT) Buy & Sell Bot</b>-এ আপনাকে স্বাগতম।\n\n"
@@ -532,7 +576,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     if text == BTN_ORDERS:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute(
             "SELECT order_id, order_type, usd_amount, bdt_amount, payment_method, status, created_at "
@@ -643,6 +687,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if step == "ADMIN_SET_VALUE" and is_admin(uid):
         s_key = state["setting_key"]
+        if s_key == "force_channel":
+            if text.strip().upper() == "OFF" or not text.strip():
+                text = ""
+            else:
+                _names = _force_channels()
+                for _part in text.replace(",", " ").split():
+                    _name = _part.strip().lstrip("@")
+                    if _name and _name not in _names:
+                        _names.append(_name)
+                text = ",".join(_names)
         if s_key in ("buy_rate", "sell_rate", "usdt_reserve", "min_usd", "max_usd", "gram_buy_rate", "gram_sell_rate", "gram_reserve", "gram_min", "gram_max", "buy_min", "buy_max", "sell_min", "sell_max", "gram_buy_min", "gram_buy_max", "gram_sell_min", "gram_sell_max"):
             try:
                 val = float(text)
@@ -661,6 +715,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "gram_buy_rate": "GRAM BUY RET", "gram_sell_rate": "GRAM SELL RET", "gram_reserve": "GRAM RESERVE",
             "gram_buy_min": "BUY GRAM MIN", "gram_buy_max": "BUY GRAM MAX",
             "gram_sell_min": "SELL GRAM MIN", "gram_sell_max": "SELL GRAM MAX",
+            "force_channel": "Force Channel",
             "bkash_number": "bKash No", "nagad_number": "Nagad No", "rocket_number": "Rocket No",
             "bep20_address": "BEP20 Address", "gram_address": "Gram Address", "support_user": "Support ID", "notice_text": "Notice Text",
         }
@@ -674,7 +729,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text(get_gram_setting_text(), reply_markup=gram_setting_markup())
         elif s_key in ("bkash_number", "nagad_number", "rocket_number", "bep20_address", "gram_address"):
             await message.reply_text(get_payment_setting_text(), reply_markup=payment_setting_markup())
-        elif s_key in ("support_user", "notice_text"):
+        elif s_key in ("support_user", "notice_text", "force_channel"):
             await message.reply_text(get_bot_setting_text(), reply_markup=bot_setting_markup())
         else:
             await message.reply_text(get_admin_dashboard_text(), reply_markup=admin_panel_inline_markup())
@@ -686,7 +741,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await message.reply_text("🔴 ❌ সঠিক Numeric Telegram ID দিন!")
             return
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute(
             "INSERT INTO users (user_id, username, full_name, joined_at, is_admin) VALUES (?, 'Admin', 'Admin', ?, 1) "
@@ -704,7 +759,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if step == "ADMIN_BROADCAST" and is_admin(uid):
         user_states.pop(uid, None)
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute("SELECT user_id FROM users")
         all_uids = [r[0] for r in c.fetchall()]
@@ -870,7 +925,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["receive_info"] = text
         uname = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute(
             """
@@ -896,7 +951,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📲 <b>মেথড:</b> {order_data['payment_method']} | <b>নাম্বার:</b> <code>{order_data['receive_info']}</code>\n"
             f"🧾 <b>Transaction Hash:</b> <code>{order_data.get('trx_proof', '')}</code>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-১০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
+            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-৩০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
             reply_markup=main_menu_keyboard(uid),
         )
         badge = "🔴 💰 NEW SELL ORDER"
@@ -927,7 +982,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["trx_proof"] = text
         uname = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute(
             """
@@ -953,7 +1008,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📲 <b>মেথড:</b> {order_data['payment_method']}\n"
             f"🧾 <b>প্রুফ/TrxID:</b> <code>{order_data['trx_proof']}</code>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-১০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
+            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-৩০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
             reply_markup=main_menu_keyboard(uid),
         )
         badge = "🟢 💵 NEW BUY ORDER" if order_data["order_type"] == "BUY" else "🔴 💰 NEW SELL ORDER"
@@ -1011,7 +1066,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["screenshot_file_id"] = message.photo[-1].file_id
         uname = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute(
             """
@@ -1037,7 +1092,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📲 <b>মেথড:</b> {order_data['payment_method']} | <b>সেন্ডার নাম্বার:</b> <code>{order_data.get('sender_number', '')}</code>\n"
             "📸 <b>স্ক্রিনশট:</b> পাঠানো হয়েছে\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-১০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
+            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-৩০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
             reply_markup=main_menu_keyboard(uid),
         )
         badge = "🟢 💵 NEW BUY ORDER"
@@ -1098,6 +1153,18 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
         await context.bot.send_message(query.message.chat.id, "মেইন মেনু:", reply_markup=main_menu_keyboard(uid))
+        return
+
+    if data == "force_check":
+        _blocked_list = await _force_gate_blocked(context, uid)
+        if _blocked_list:
+            await context.bot.send_message(
+                query.message.chat.id,
+                "📢 <b>এখনো সব চ্যানেলে Join করা হয়নি।</b>\n\nবাকি চ্যানেলগুলোতে Join করুন, তারপর ✅ বাটন চাপুন।",
+                reply_markup=_force_gate_markup(_blocked_list),
+            )
+        else:
+            await context.bot.send_message(query.message.chat.id, "🟢 ✅ Join সম্পন্ন! মেইন মেনু:", reply_markup=main_menu_keyboard(uid))
         return
 
     if data in ("buy_choice_usdt", "buy_choice_gram", "sell_choice_bep20", "sell_choice_gram"):
@@ -1298,6 +1365,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         "adm_set_bep20_address": ("bep20_address", "🟡 নতুন <b>BEP20 Address</b> লিখুন:"),
         "adm_set_gram_address": ("gram_address", "💎 নতুন <b>Gram Address</b> লিখুন:"),
         "adm_set_support": ("support_user", "📞 নতুন <b>Support Username</b> লিখুন (যেমন: @MySupport):"),
+        "adm_set_force_channel": ("force_channel", "📢 <b>নতুন Force Channel যোগ করুন</b> — আগেরগুলোর সাথে যোগ হবে, ২টা একসাথে লিখলেও হবে (@ ছাড়া, কমা দিয়ে, যেমন: chan2, chan3) — সব বন্ধ করতে লিখুন: OFF"),
         "adm_set_notice": ("notice_text", "📢 নতুন <b>Notice / ঘোষণা</b> টেক্সট লিখুন:"),
     }
     if data in setting_prompts:
@@ -1325,7 +1393,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if data == "adm_pending_orders":
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         c.execute(
             "SELECT order_id, user_id, username, order_type, usd_amount, bdt_amount, payment_method, receive_info, trx_proof, created_at "
@@ -1361,7 +1429,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         parts = data.split("_")
         action = parts[2]
         order_id = int(parts[3])
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
         c = conn.cursor()
         try:
             c.execute(
@@ -1455,6 +1523,8 @@ def _run_web_server():
 def main():
     if not BOT_TOKEN:
         raise SystemExit("BOT_TOKEN environment variable set korun!")
+    if not MAIN_ADMIN_ID:
+        raise SystemExit("ADMIN_ID environment variable set korun!")
     init_db()
     print("====================================================")
     print("💎 Binance Dollar Buy-Sell Bot is Running...")
