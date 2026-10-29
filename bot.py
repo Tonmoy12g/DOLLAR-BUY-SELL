@@ -8,7 +8,7 @@ python-telegram-bot version — converted from binance_dollar_bot.py (telebot)
 Features (preserved exactly from the telebot version):
 - /start welcome with Buy/Sell rates and reserve, Today's Rate, My Orders, Support
 - Buy Dollar (USDT), Sell Dollar (USDT) — amount -> payment method ->
-  receive info -> TrxID/proof -> Pending -> admin Approve/Reject
+  receive info -> proof -> Pending -> admin Approve/Reject
 - Sell-only Max: Min Order applies to both, Max Order applies to SELL only
   (Buy prompt shows Min only; Sell prompt shows Min + Max; Sell > Max rejected)
 - Admin Panel: Bot Status toggle, bKash/Nagad/Rocket ON/OFF toggles,
@@ -267,7 +267,8 @@ def main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     # like the SMM bot main menu. Inline buttons are intentionally untouched.
     rows = [
         [_mkb(BTN_BUY, "primary"), _mkb(BTN_SELL, "success")],
-        [_mkb(BTN_BUY_GRAM, "primary"), _mkb(BTN_SELL_GRAM, "success")],
+        # 2026-10-29 21:29-21:31: separate Buy Gram and Sell Gram buttons removed.
+        # Gram Buy is only inside Buy Dollar -> USDT / Gram, Gram Sell only inside Sell Dollar -> BEP20 / Gram.
         [_mkb(BTN_RATE, "primary"), _mkb(BTN_ORDERS, "success")],
     ]
     if is_admin(user_id):
@@ -763,9 +764,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💵 <b>পরিমাণ:</b> <code>{usd_amount} {_unit2}</code> | 💴 <b>পাবেন:</b> <code>{bdt_amount:.2f} BDT</code>\n"
                 f"🟡 <b>আমাদের {_addr_lbl}:</b>\n"
                 f"👉 <code>{_admin_addr}</code>\n\n"
-                "✍️ <b>সহজ করে বলছি:</b>\n"
+                "✍️ <b>সহজ করে বলছি — একটা একটা করে:</b>\n"
                 f"১) উপরের {_addr_lbl} কপি করে {_unit2} পাঠান\n"
-                "২) পাঠানোর পর Transaction Hash-টা এখানে লিখুন",
+                "২) পাঠানোর পর শুধু Transaction Hash-টা এখানে লিখুন\n\n"
+                "⚠️ <b>স্ক্রিনশট এখন পাঠাবেন না।</b> Transaction Hash পাঠানোর পর আমি আলাদাভাবে স্ক্রিনশট চাইবো, তখন স্ক্রিনশট পাঠাবেন।",
                 reply_markup=cancel_keyboard(),
             )
             return
@@ -787,7 +789,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if step == "ENTER_RECEIVE_INFO":
         state["receive_info"] = text
-        # NEW Buy flow: after payment, sender number + screenshot + TrxID
+        # NEW Buy flow: after payment, sender number + screenshot only, NO TrxID
         state["step"] = "BUY_SENDER_NUMBER" if state["order_type"] == "BUY" else "ENTER_TRX_PROOF"
         pm = state["payment_method"]
         bdt_amount = state["bdt_amount"]
@@ -809,11 +811,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💴 <b>পাঠানোর পরিমাণ:</b> <code>{bdt_amount:.2f} BDT</code>\n"
                 f"📥 <b>আপনার {_recv_lbl}:</b> <code>{text}</code>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "✍️ <b>সহজ করে বলছি:</b>\n"
+                "✍️ <b>সহজ করে বলছি — একটা একটা করে:</b>\n"
                 "১) উপরের নাম্বারে টাকা পাঠান\n"
-                "২) পেমেন্ট করার পর যে নাম্বার থেকে টাকা পাঠিয়েছেন, সেই নাম্বারটা লিখুন\n"
-                "৩) তারপর পেমেন্টের স্ক্রিনশট পাঠান\n"
-                "৪) তারপর TrxID কোডটা লিখুন"
+                "২) টাকা পাঠানোর পর শুধু যে নাম্বার থেকে টাকা পাঠিয়েছেন, সেই নাম্বারটা এখানে লিখুন\n\n"
+                "⚠️ <b>স্ক্রিনশট এখন পাঠাবেন না।</b> নাম্বার পাঠানোর পর আমি আলাদাভাবে স্ক্রিনশট চাইবো, তখন স্ক্রিনশট পাঠাবেন।"
             )
         else:
             _admin_addr = get_setting("gram_address") if _pay_unit == "GRAM" else get_setting("bep20_address")
@@ -836,7 +837,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["sender_number"] = text
         state["step"] = "BUY_SCREENSHOT"
         await message.reply_text(
-            "📸 <b>এখন পেমেন্টের স্ক্রিনশট পাঠান:</b>\n\nপেমেন্ট করার পর যে স্ক্রিনশটটা পেয়েছেন, সেটা ছবি হিসেবে এখানে পাঠান।",
+            "📸 <b>আলাদা ধাপ — এখন পেমেন্টের স্ক্রিনশট পাঠান:</b>\n\nনাম্বারটা পেয়েছি। এখন শুধু পেমেন্টের স্ক্রিনশটটা ছবি হিসেবে এখানে পাঠান।",
             reply_markup=cancel_keyboard(),
         )
         return
@@ -852,7 +853,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["trx_proof"] = text
         state["step"] = "SELL_SCREENSHOT"
         await message.reply_text(
-            "📸 <b>এখন ট্রান্সফারের স্ক্রিনশট পাঠান:</b>\n\nডলার / Gram পাঠানোর পর যে স্ক্রিনশটটা পেয়েছেন, সেটা ছবি হিসেবে এখানে পাঠান।",
+            "📸 <b>আলাদা ধাপ — এখন ট্রান্সফারের স্ক্রিনশট পাঠান:</b>\n\nTransaction Hash পেয়েছি। এখন শুধু ট্রান্সফারের স্ক্রিনশটটা ছবি হিসেবে এখানে পাঠান।",
             reply_markup=cancel_keyboard(),
         )
         return
@@ -998,10 +999,72 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     if step == "BUY_SCREENSHOT":
+        # Buy proof is now sender number + screenshot only, NO TrxID (2026-10-29 21:24).
         state["screenshot_file_id"] = message.photo[-1].file_id
-        state["step"] = "ENTER_TRX_PROOF"
+        uname = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(
+            """
+            INSERT INTO orders (user_id, username, order_type, usd_amount, bdt_amount, rate, payment_method, receive_info, trx_proof, status, created_at, currency, sender_number, screenshot_file_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 'PENDING', ?, ?, ?, ?)
+            """,
+            (uid, uname, state["order_type"], state["usd_amount"], state["bdt_amount"], state["rate"],
+             state["payment_method"], state["receive_info"], created_at, state.get("currency", "USDT"),
+             state.get("sender_number", ""), state.get("screenshot_file_id", "")),
+        )
+        order_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        order_data = dict(state)
+        user_states.pop(uid, None)
         await message.reply_text(
-            "✅ স্ক্রিনশট পেয়েছি।\n\n✍️ <b>এখন TrxID কোডটা লিখুন:</b>",
+            f"🟢 ✅ <b>আপনার অর্ডারটি সফলভাবে জমা হয়েছে!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆔 <b>Order ID:</b> <code>#{order_id}</code>\n"
+            f"📌 <b>ধরণ:</b> {order_data['order_type']} {order_data.get('currency', 'USDT')}\n"
+            f"💵 <b>পরিমাণ:</b> <code>{order_data['usd_amount']} {order_data.get('currency', 'USDT')}</code>\n"
+            f"💴 <b>টাকা:</b> <code>{order_data['bdt_amount']:.2f} BDT</code>\n"
+            f"📲 <b>মেথড:</b> {order_data['payment_method']} | <b>সেন্ডার নাম্বার:</b> <code>{order_data.get('sender_number', '')}</code>\n"
+            "📸 <b>স্ক্রিনশট:</b> পাঠানো হয়েছে\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⏳ অ্যাডমিন আপনার লেনদেন যাচাই করে ৫-১০ মিনিটের মধ্যে অর্ডার সম্পন্ন করবেন।",
+            reply_markup=main_menu_keyboard(uid),
+        )
+        badge = "🟢 💵 NEW BUY ORDER"
+        admin_alert = (
+            f"🔔 <b>{badge} — #{order_id}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>User:</b> {uname} (<code>{uid}</code>)\n"
+            f"💵 <b>Amount:</b> <code>{order_data['usd_amount']} {order_data.get('currency', 'USDT')}</code>\n"
+            f"💴 <b>Total BDT:</b> <code>{order_data['bdt_amount']:.2f} BDT</code> (Rate: {order_data['rate']})\n"
+            f"📲 <b>Method:</b> {order_data['payment_method']} | <b>Sender Number:</b> <code>{order_data.get('sender_number', '')}</code>\n"
+            f"📥 <b>Receive Info:</b> <code>{order_data['receive_info']}</code>\n"
+            f"📸 <b>Screenshot:</b> পাঠানো হয়েছে\n"
+            f"🕒 <b>Time:</b> {created_at}"
+        )
+        adm_mk = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🟢 ✅ Approve Order", callback_data=f"adm_order_approve_{order_id}"),
+             InlineKeyboardButton("🔴 ❌ Reject Order", callback_data=f"adm_order_reject_{order_id}")],
+        ])
+        for adm_id in get_all_admin_ids():
+            try:
+                await context.bot.send_message(adm_id, admin_alert, reply_markup=adm_mk)
+                if order_data.get("screenshot_file_id"):
+                    await context.bot.send_photo(adm_id, order_data["screenshot_file_id"], caption=f"📸 Screenshot — Buy Order #{order_id}")
+            except Exception:
+                pass
+        return
+    if step == "BUY_SENDER_NUMBER":
+        await message.reply_text(
+            "⚠️ আগে নাম্বারটা লিখুন।\n\nটাকা যে নাম্বার থেকে পাঠিয়েছেন, সেই নাম্বারটা লিখে পাঠান, তারপর আমি আলাদাভাবে স্ক্রিনশট চাইবো।",
+            reply_markup=cancel_keyboard(),
+        )
+        return
+    if step == "SELL_TXHASH":
+        await message.reply_text(
+            "⚠️ আগে Transaction Hash লিখুন।\n\nTransaction Hash লেখার পর আমি আলাদাভাবে স্ক্রিনশট চাইবো।",
             reply_markup=cancel_keyboard(),
         )
         return
