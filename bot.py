@@ -268,7 +268,7 @@ def main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     rows = [
         [_mkb(BTN_BUY, "primary"), _mkb(BTN_SELL, "success")],
         # 2026-10-29 21:29-21:31: separate Buy Gram and Sell Gram buttons removed.
-        # Gram Buy is only inside Buy Dollar -> USDT / Gram, Gram Sell only inside Sell Dollar -> BEP20 / Gram.
+        # Gram Buy is only inside Buy Dollar -> USDT / Gram, Gram Sell only inside Sell Dollar -> USDT / Gram (BEP20 address behind the scenes).
         [_mkb(BTN_RATE, "primary"), _mkb(BTN_ORDERS, "success")],
     ]
     if is_admin(user_id):
@@ -624,7 +624,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text(
                 "🔴 💰 <b>Sell Dollar</b>\n\nকোনটা বিক্রি করতে চান, সিলেক্ট করুন:",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🟡 BEP20", callback_data="sell_choice_bep20"),
+                    [InlineKeyboardButton("💵 USDT", callback_data="sell_choice_bep20"),
                      InlineKeyboardButton("💎 Gram", callback_data="sell_choice_gram")],
                     [InlineKeyboardButton("🔴 ❌ Cancel Order", callback_data="user_cancel_flow")],
                 ]),
@@ -755,19 +755,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # NEW Sell flow: amount -> admin address -> TxHash -> screenshot -> method -> number
         if state["order_type"] == "SELL" and state.get("new_sell"):
             _unit2 = state.get("currency", "USDT")
+            _unit_disp = "Gram" if _unit2 == "GRAM" else "USDT"
             _addr_lbl = "Gram Address" if _unit2 == "GRAM" else "BEP20 Address"
             _admin_addr = get_setting("gram_address") if _unit2 == "GRAM" else get_setting("bep20_address")
             state["step"] = "SELL_TXHASH"
             await message.reply_text(
-                f"🔴 💎 <b>Sell {_unit2} — অ্যাড্রেস</b>\n"
+                f"🔴 💎 <b>Sell {_unit_disp}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💵 <b>পরিমাণ:</b> <code>{usd_amount} {_unit2}</code> | 💴 <b>পাবেন:</b> <code>{bdt_amount:.2f} BDT</code>\n"
+                f"💵 <b>পরিমাণ:</b> <code>{usd_amount} {_unit_disp}</code> | 💴 <b>পাবেন:</b> <code>{bdt_amount:.2f} BDT</code>\n"
                 f"🟡 <b>আমাদের {_addr_lbl}:</b>\n"
-                f"👉 <code>{_admin_addr}</code>\n\n"
-                "✍️ <b>সহজ করে বলছি — একটা একটা করে:</b>\n"
-                f"১) উপরের {_addr_lbl} কপি করে {_unit2} পাঠান\n"
-                "২) পাঠানোর পর শুধু Transaction Hash-টা এখানে লিখুন\n\n"
-                "⚠️ <b>স্ক্রিনশট এখন পাঠাবেন না।</b> Transaction Hash পাঠানোর পর আমি আলাদাভাবে স্ক্রিনশট চাইবো, তখন স্ক্রিনশট পাঠাবেন।",
+                f"👉 <code>{_admin_addr}</code>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "✍️ <b>নিয়ম:</b>\n"
+                f"১) উপরের {_addr_lbl} কপি করে {_unit_disp} পাঠান\n"
+                "২) পাঠানোর পর শুধু Transaction Hash-টা এখানে দিবেন।\n"
+                "৩) তারপর স্ক্রিনশট দিবেন\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "আপনি যে Transaction Hash পাইছেন, সেটা লিখে দেন👇",
                 reply_markup=cancel_keyboard(),
             )
             return
@@ -801,10 +805,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         admin_pay_no = num_map.get(pm, "")
         _pay_unit = state.get("currency", "USDT")
+        _pay_disp = "Gram" if _pay_unit == "GRAM" else "USDT"
         _recv_lbl = "Gram Address" if _pay_unit == "GRAM" else "BEP20 Address"
         if state["order_type"] == "BUY":
             pay_instructions = (
-                f"🟢 💳 <b>পেমেন্ট করার নিয়মাবলী (Buy {_pay_unit}):</b>\n"
+                f"🟢 💳 <b>পেমেন্ট করার নিয়মাবলী (Buy {_pay_disp}):</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📲 <b>আমাদের {pm} নাম্বার:</b>\n"
                 f"👉 <code>{admin_pay_no}</code>\n\n"
@@ -854,8 +859,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if step == "SELL_TXHASH":
         state["trx_proof"] = text
         state["step"] = "SELL_SCREENSHOT"
+        _unit_disp2 = "Gram" if state.get("currency") == "GRAM" else "USDT"
         await message.reply_text(
-            "📸 <b>আলাদা ধাপ — এখন ট্রান্সফারের স্ক্রিনশট পাঠান:</b>\n\nTransaction Hash পেয়েছি। এখন শুধু ট্রান্সফারের স্ক্রিনশটটা ছবি হিসেবে এখানে পাঠান।",
+            f"📸 <b>আপনি যে {_unit_disp2} পাঠাইছেন, তার স্ক্রিনশট দেন</b>\n\nTransaction Hash পেয়েছি। এখন শুধু স্ক্রিনশটটা ছবি হিসেবে এখানে পাঠান।",
             reply_markup=cancel_keyboard(),
         )
         return
