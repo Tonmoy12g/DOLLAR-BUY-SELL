@@ -804,17 +804,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _recv_lbl = "Gram Address" if _pay_unit == "GRAM" else "BEP20 Address"
         if state["order_type"] == "BUY":
             pay_instructions = (
-                f"🟢 💳 <b>পেমেন্ট করার নিয়মাবলী (Buy {_pay_unit}):</b>\n"
+                f"🟢 💳 <b>পেমেন্ট করার নিয়মাবলী (Buy {_pay_unit}):</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📲 <b>আমাদের {pm} নাম্বার:</b>\n"
                 f"👉 <code>{admin_pay_no}</code>\n\n"
                 f"💴 <b>পাঠানোর পরিমাণ:</b> <code>{bdt_amount:.2f} BDT</code>\n"
                 f"📥 <b>আপনার {_recv_lbl}:</b> <code>{text}</code>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "✍️ <b>সহজ করে বলছি — একটা একটা করে:</b>\n"
+                "✍️ <b>নিয়ম:</b>\n"
                 "১) উপরের নাম্বারে টাকা পাঠান\n"
-                "২) টাকা পাঠানোর পর শুধু যে নাম্বার থেকে টাকা পাঠিয়েছেন, সেই নাম্বারটা এখানে লিখুন\n\n"
-                "⚠️ <b>স্ক্রিনশট এখন পাঠাবেন না।</b> নাম্বার পাঠানোর পর আমি আলাদাভাবে স্ক্রিনশট চাইবো, তখন স্ক্রিনশট পাঠাবেন।"
+                "২) টাকা পাঠানোর পর শুধু যে নাম্বার থেকে টাকা পাঠিয়েছেন, সেই নাম্বারটা এখানে দিবেন।\n"
+                "৩) তারপর পেমেন্টের স্ক্রিনশট দিবেন\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "আপনি যে নাম্বার দিয়ে টাকা পাঠাইছেন, সে নাম্বার লিখে দেন👇"
             )
         else:
             _admin_addr = get_setting("gram_address") if _pay_unit == "GRAM" else get_setting("bep20_address")
@@ -837,7 +839,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["sender_number"] = text
         state["step"] = "BUY_SCREENSHOT"
         await message.reply_text(
-            "📸 <b>আলাদা ধাপ — এখন পেমেন্টের স্ক্রিনশট পাঠান:</b>\n\nনাম্বারটা পেয়েছি। এখন শুধু পেমেন্টের স্ক্রিনশটটা ছবি হিসেবে এখানে পাঠান।",
+            "📸 <b>আপনি যে টাকা পাঠাইছেন, তার স্ক্রিনশট দেন</b>\n\nনাম্বারটা পেয়েছি। এখন শুধু টাকার স্ক্রিনশটটা ছবি হিসেবে এখানে পাঠান।",
             reply_markup=cancel_keyboard(),
         )
         return
