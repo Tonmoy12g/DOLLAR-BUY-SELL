@@ -34,7 +34,10 @@ Setup:
 
 import os
 import sqlite3
+import threading
 from datetime import datetime
+
+from flask import Flask
 
 from telegram import (
     InlineKeyboardButton,
@@ -117,11 +120,21 @@ def init_db():
         "buy_rate": "125.0",
         "sell_rate": "121.0",
         "min_usd": "5.0",
-        "max_usd": "1000.0",  # Maximum Sell USD (Sell only)
+        "max_usd": "1000.0",
+        "buy_min": "5.0",
+        "buy_max": "1000.0",
+        "sell_min": "5.0",
+        "sell_max": "1000.0",
+        "gram_buy_min": "5.0",
+        "gram_buy_max": "1000.0",
+        "gram_sell_min": "5.0",
+        "gram_sell_max": "1000.0",
         "usdt_reserve": "500.0",
         "gram_buy_rate": "125.0",
         "gram_sell_rate": "121.0",
         "gram_reserve": "500.0",
+        "gram_min": "5.0",
+        "gram_max": "1000.0",
         "bkash_active": "1",
         "nagad_active": "1",
         "rocket_active": "1",
@@ -292,12 +305,14 @@ def admin_panel_inline_markup() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(f"🔵 Rocket: {rocket_st}", callback_data="adm_toggle_rocket")],
         [InlineKeyboardButton(f"🟢 Buy Rate: {buy_r}৳", callback_data="adm_set_buy_rate"),
          InlineKeyboardButton(f"🔴 Sell Rate: {sell_r}৳", callback_data="adm_set_sell_rate")],
-        [InlineKeyboardButton(f"💎 Reserve: {res_u}$", callback_data="adm_set_reserve"),
-         InlineKeyboardButton(f"📉 Min Order: {min_u}$", callback_data="adm_set_min_usd")],
-        [InlineKeyboardButton(f"📈 Max Order: {max_u}$", callback_data="adm_set_max_usd")],
+        [InlineKeyboardButton(f"💎 Reserve: {res_u}$", callback_data="adm_set_reserve")],
+        [InlineKeyboardButton(f"💵 Dollar Min: {get_setting('min_usd')}$", callback_data="adm_set_min_usd"),
+         InlineKeyboardButton(f"💵 Dollar Max: {get_setting('max_usd')}$", callback_data="adm_set_max_usd")],
         [InlineKeyboardButton(f"💎 Gram Buy Rate: {get_setting('gram_buy_rate')}৳", callback_data="adm_set_gram_buy_rate"),
          InlineKeyboardButton(f"💎 Gram Sell Rate: {get_setting('gram_sell_rate')}৳", callback_data="adm_set_gram_sell_rate")],
         [InlineKeyboardButton(f"💎 Gram Reserve: {get_setting('gram_reserve')}", callback_data="adm_set_gram_reserve")],
+        [InlineKeyboardButton(f"💎 Gram Min: {get_setting('gram_min')}", callback_data="adm_set_gram_min"),
+         InlineKeyboardButton(f"💎 Gram Max: {get_setting('gram_max')}", callback_data="adm_set_gram_max")],
         [InlineKeyboardButton("🟣 Set bKash No", callback_data="adm_set_bkash_no"),
          InlineKeyboardButton("🟠 Set Nagad No", callback_data="adm_set_nagad_no")],
         [InlineKeyboardButton("🔵 Set Rocket No", callback_data="adm_set_rocket_no"),
@@ -455,8 +470,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_buy = text == BTN_BUY_GRAM
         order_type = "BUY" if is_buy else "SELL"
         rate = float(get_setting("gram_buy_rate" if is_buy else "gram_sell_rate"))
-        min_usd = float(get_setting("min_usd"))
-        max_usd = float(get_setting("max_usd"))
+        min_usd = float(get_setting("gram_min"))
+        max_usd = float(get_setting("gram_max"))
         reserve = float(get_setting("gram_reserve"))
         user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "GRAM"}
         if is_buy:
@@ -540,7 +555,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if step == "ADMIN_SET_VALUE" and is_admin(uid):
         s_key = state["setting_key"]
-        if s_key in ("buy_rate", "sell_rate", "usdt_reserve", "min_usd", "max_usd", "gram_buy_rate", "gram_sell_rate", "gram_reserve"):
+        if s_key in ("buy_rate", "sell_rate", "usdt_reserve", "min_usd", "max_usd", "gram_buy_rate", "gram_sell_rate", "gram_reserve", "gram_min", "gram_max", "buy_min", "buy_max", "sell_min", "sell_max", "gram_buy_min", "gram_buy_max", "gram_sell_min", "gram_sell_max"):
             try:
                 val = float(text)
                 if val <= 0 and s_key != "usdt_reserve":
@@ -606,18 +621,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await message.reply_text("🔴 ❌ অনুগ্রহ করে শুধুমাত্র সংখ্যায় ডলারের পরিমাণ লিখুন (যেমন: 10 বা 25.5):")
             return
-        min_usd = float(get_setting("min_usd"))
-        max_usd = float(get_setting("max_usd"))
+        _is_gram = state.get("currency") == "GRAM"
+        min_usd = float(get_setting("gram_min" if _is_gram else "min_usd"))
+        max_usd = float(get_setting("gram_max" if _is_gram else "max_usd"))
+        _unit_lbl = "Gram" if _is_gram else "USDT"
         if usd_amount < min_usd:
-            await message.reply_text(f"🔴 ⚠️ সর্বনিম্ন অর্ডার পরিমাণ <b>{min_usd} USDT</b>। অনুগ্রহ করে আবার লিখুন:")
+            await message.reply_text(f"🔴 ⚠️ সর্বনিম্ন অর্ডার পরিমাণ <b>{min_usd} {_unit_lbl}</b>। অনুগ্রহ করে আবার লিখুন:")
             return
         if state["order_type"] == "SELL" and usd_amount > max_usd:
-            await message.reply_text(f"🔴 ⚠️ সর্বোচ্চ অর্ডার পরিমাণ <b>{max_usd} USDT</b>। অনুগ্রহ করে আবার লিখুন:")
+            await message.reply_text(f"🔴 ⚠️ সর্বোচ্চ অর্ডার পরিমাণ <b>{max_usd} {_unit_lbl}</b>। অনুগ্রহ করে আবার লিখুন:")
             return
         if state["order_type"] == "BUY":
             reserve = float(get_setting("gram_reserve" if state.get("currency") == "GRAM" else "usdt_reserve"))
             if usd_amount > reserve:
-                await message.reply_text(f"🔴 ⚠️ আমাদের বর্তমান রিজার্ভ <b>{reserve} USDT</b>। এর সমান বা কম পরিমাণ লিখুন:")
+                await message.reply_text(f"🔴 ⚠️ আমাদের বর্তমান রিজার্ভ <b>{reserve} {_unit_lbl}</b>। এর সমান বা কম পরিমাণ লিখুন:")
                 return
         rate = state["rate"]
         bdt_amount = round(usd_amount * rate, 2)
@@ -625,12 +642,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["bdt_amount"] = bdt_amount
         state["step"] = "SELECT_PAYMENT"
         _unit = state.get("currency", "USDT")
+        _rate_lbl = "BDT / Gram" if _unit == "GRAM" else "BDT / $1"
         type_badge = f"🟢 💵 BUY {_unit}" if state["order_type"] == "BUY" else f"🔴 💰 SELL {_unit}"
         summary = (
             f"<b>{type_badge} — হিসাব বিবরণী</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             f"💵 <b>পরিমাণ:</b> <code>{usd_amount} {_unit}</code>\n"
-            f"📊 <b>রেট:</b> <code>{rate} BDT / $1</code>\n"
+            f"📊 <b>রেট:</b> <code>{rate} {_rate_lbl}</code>\n"
             f"💴 <b>মোট টাকার পরিমাণ:</b> <code>{bdt_amount:.2f} BDT</code>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "👇 <b>নিচের রঙিন বাটন থেকে আপনার পছন্দের পেমেন্ট মেথড সিলেক্ট করুন:</b>"
@@ -650,28 +668,33 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Rocket": get_setting("rocket_number"),
         }
         admin_pay_no = num_map.get(pm, "")
+        _pay_unit = state.get("currency", "USDT")
         if state["order_type"] == "BUY":
             pay_instructions = (
-                "🟢 💳 <b>পেমেন্ট করার নিয়মাবলী (Buy USDT):</b>\n"
+                f"🟢 💳 <b>পেমেন্ট করার নিয়মাবলী (Buy {_pay_unit}):</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📲 <b>আমাদের {pm} নাম্বার:</b>\n"
                 f"👉 <code>{admin_pay_no}</code>\n\n"
                 f"💴 <b>পাঠানোর পরিমাণ:</b> <code>{bdt_amount:.2f} BDT</code>\n"
                 f"📥 <b>আপনার Binance UID:</b> <code>{text}</code>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "✍️ উপরের নাম্বারে টাকা পাঠিয়ে আপনার <b>Transaction ID (TrxID) এবং যে নাম্বার থেকে টাকা পাঠিয়েছেন তার শেষ ৪ ডিজিট</b> লিখে পাঠান:"
+                "✍️ <b>সহজ করে বলছি:</b>\n"
+                "১) উপরের নাম্বারে টাকা পাঠান\n"
+                "২) টাকা পাঠানোর পর যে TrxID কোডটা পাবেন, শুধু সেটা এখানে লিখুন"
             )
         else:
             binance_uid = get_setting("binance_uid")
             pay_instructions = (
-                "🔴 💎 <b>ডলার পাঠানোর নিয়মাবলী (Sell USDT):</b>\n"
+                f"🔴 💎 <b>{_pay_unit} পাঠানোর নিয়মাবলী (Sell {_pay_unit}):</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🟡 <b>আমাদের Binance Pay ID / UID:</b>\n"
                 f"👉 <code>{binance_uid}</code>\n\n"
-                f"💵 <b>পাঠানোর পরিমাণ:</b> <code>{usd_amount} USDT</code>\n"
+                f"💵 <b>পাঠানোর পরিমাণ:</b> <code>{usd_amount} {_pay_unit}</code>\n"
                 f"📲 <b>টাকা পাবেন ({pm}):</b> <code>{text}</code> ({bdt_amount:.2f} BDT)\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "✍️ উপরের Binance UID-তে ডলার (USDT) পাঠিয়ে আপনার <b>Binance Order ID / আপনার Binance নেম বা UID</b> লিখে পাঠান:"
+                "✍️ <b>সহজ করে বলছি:</b>\n"
+                f"১) উপরের Binance UID-তে {_pay_unit} পাঠান\n"
+                "২) শুধু আপনার Binance Order ID-টা এখানে লিখুন"
             )
         await message.reply_text(pay_instructions, reply_markup=cancel_keyboard())
         return
@@ -754,8 +777,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_buy = data == "gram_buy"
         order_type = "BUY" if is_buy else "SELL"
         rate = float(get_setting("gram_buy_rate" if is_buy else "gram_sell_rate"))
-        min_usd = float(get_setting("min_usd"))
-        max_usd = float(get_setting("max_usd"))
+        min_usd = float(get_setting("gram_min"))
+        max_usd = float(get_setting("gram_max"))
         reserve = float(get_setting("gram_reserve"))
         user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "GRAM"}
         if is_buy:
@@ -794,7 +817,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state["order_type"] == "BUY":
             await query.edit_message_text(
                 f"🟢 আপনি পেমেন্ট মেথড হিসেবে <b>{method}</b> সিলেক্ট করেছেন।\n\n"
-                "🟡 ✍️ <b>এখন আপনার Binance Pay ID / UID (অথবা Binance Email) লিখে পাঠান যেখানে আপনি ডলার (USDT) গ্রহণ করবেন:</b>"
+                f"🟡 ✍️ <b>এখন আপনার Binance Pay ID / UID (অথবা Binance Email) লিখে পাঠান যেখানে আপনি {state.get('currency', 'USDT')} গ্রহণ করবেন:</b>"
             )
         else:
             await query.edit_message_text(
@@ -849,6 +872,10 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         "adm_set_gram_buy_rate": ("gram_buy_rate", "💎 নতুন <b>Gram Buy Rate (BDT)</b> লিখুন (যেমন: 125.5):"),
         "adm_set_gram_sell_rate": ("gram_sell_rate", "💎 নতুন <b>Gram Sell Rate (BDT)</b> লিখুন (যেমন: 121.0):"),
         "adm_set_gram_reserve": ("gram_reserve", "💎 নতুন <b>Gram Reserve</b> পরিমাণ লিখুন (যেমন: 500):"),
+        "adm_set_min_usd": ("min_usd", "💵 Dollar-এর সর্বনিম্ন (<b>Dollar Min</b>) লিখুন (যেমন: 5):"),
+        "adm_set_max_usd": ("max_usd", "💵 Dollar-এর সর্বোচ্চ (<b>Dollar Max</b>) লিখুন (যেমন: 1000):"),
+        "adm_set_gram_min": ("gram_min", "💎 Gram-এর সর্বনিম্ন (<b>Gram Min</b>) লিখুন (যেমন: 5):"),
+        "adm_set_gram_max": ("gram_max", "💎 Gram-এর সর্বোচ্চ (<b>Gram Max</b>) লিখুন (যেমন: 1000):"),
         "adm_set_bkash_no": ("bkash_number", "🟣 নতুন <b>bKash নাম্বার</b> লিখুন (যেমন: 017XXXXXXXX Personal):"),
         "adm_set_nagad_no": ("nagad_number", "🟠 নতুন <b>Nagad নাম্বার</b> লিখুন (যেমন: 018XXXXXXXX Personal):"),
         "adm_set_rocket_no": ("rocket_number", "🔵 নতুন <b>Rocket নাম্বার</b> লিখুন (যেমন: 019XXXXXXXX Personal):"),
@@ -989,6 +1016,23 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ====================================================================
+# WEB KEEP-ALIVE (Render free Web Service er jonno)
+# Render Web Service ekta Port khola asha kore; bot shudhu polling
+# korle "Timed Out / Deploy failed" hoy. Ei chhoto web server PORT-e
+# shone, tai Deploy Live thake. Bot er kaj ager motoi polling-e chole.
+# ====================================================================
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def _web_home():
+    return "Binance Dollar Buy-Sell Bot is Running", 200
+
+def _run_web_server():
+    _port = int(os.environ.get("PORT", "10000"))
+    web_app.run(host="0.0.0.0", port=_port)
+
+
+# ====================================================================
 # MAIN ENTRYPOINT
 # ====================================================================
 def main():
@@ -1009,6 +1053,7 @@ def main():
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
+    threading.Thread(target=_run_web_server, daemon=True).start()
     app.run_polling()
 
 
