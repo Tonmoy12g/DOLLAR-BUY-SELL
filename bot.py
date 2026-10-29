@@ -289,48 +289,73 @@ def has_any_active_payment() -> bool:
 
 
 def admin_panel_inline_markup() -> InlineKeyboardMarkup:
-    bot_st = "🟢 ON" if get_setting("bot_active") == "1" else "🔴 OFF"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💵 DOLLAR SETTING", callback_data="adm_open_dollar"),
+         InlineKeyboardButton("💎 GRAM SETTING", callback_data="adm_open_gram")],
+        [InlineKeyboardButton("💳 PAYMENT SYSTEM", callback_data="adm_open_payment"),
+         InlineKeyboardButton("🤖 BOT SETTING", callback_data="adm_open_bot")],
+        [InlineKeyboardButton("📦 Pending Orders", callback_data="adm_pending_orders"),
+         InlineKeyboardButton("🔄 Refresh Panel", callback_data="adm_refresh")],
+        [InlineKeyboardButton("⬅️ Main Menu", callback_data="adm_main_menu")],
+    ])
+
+
+def dollar_setting_markup() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🟢 BUY RET: {get_setting('buy_rate')}৳", callback_data="adm_set_buy_rate"),
+         InlineKeyboardButton(f"🔴 SELL RET: {get_setting('sell_rate')}৳", callback_data="adm_set_sell_rate")],
+        [InlineKeyboardButton(f"💎 RESERVE: {get_setting('usdt_reserve')}$", callback_data="adm_set_reserve")],
+        [InlineKeyboardButton(f"🟢 BUY DOLLAR MIN: {get_setting('buy_min')}$", callback_data="adm_set_buy_min"),
+         InlineKeyboardButton(f"🟢 BUY DOLLAR MAX: {get_setting('buy_max')}$", callback_data="adm_set_buy_max")],
+        [InlineKeyboardButton(f"🔴 SELL DOLLAR MIN: {get_setting('sell_min')}$", callback_data="adm_set_sell_min"),
+         InlineKeyboardButton(f"🔴 SELL DOLLAR MAX: {get_setting('sell_max')}$", callback_data="adm_set_sell_max")],
+        [InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="adm_back_admin")],
+    ])
+
+
+def gram_setting_markup() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🟢 BUY RET: {get_setting('gram_buy_rate')}৳", callback_data="adm_set_gram_buy_rate"),
+         InlineKeyboardButton(f"🔴 SELL RET: {get_setting('gram_sell_rate')}৳", callback_data="adm_set_gram_sell_rate")],
+        [InlineKeyboardButton(f"💎 RESERVE: {get_setting('gram_reserve')}", callback_data="adm_set_gram_reserve")],
+        [InlineKeyboardButton(f"🟢 BUY GRAM MIN: {get_setting('gram_buy_min')}", callback_data="adm_set_gram_buy_min"),
+         InlineKeyboardButton(f"🟢 BUY GRAM MAX: {get_setting('gram_buy_max')}", callback_data="adm_set_gram_buy_max")],
+        [InlineKeyboardButton(f"🔴 SELL GRAM MIN: {get_setting('gram_sell_min')}", callback_data="adm_set_gram_sell_min"),
+         InlineKeyboardButton(f"🔴 SELL GRAM MAX: {get_setting('gram_sell_max')}", callback_data="adm_set_gram_sell_max")],
+        [InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="adm_back_admin")],
+    ])
+
+
+def payment_setting_markup() -> InlineKeyboardMarkup:
     bkash_st = "🟢 ON" if get_setting("bkash_active") == "1" else "🔴 OFF"
     nagad_st = "🟢 ON" if get_setting("nagad_active") == "1" else "🔴 OFF"
     rocket_st = "🟢 ON" if get_setting("rocket_active") == "1" else "🔴 OFF"
-    buy_r = get_setting("buy_rate")
-    sell_r = get_setting("sell_rate")
-    min_u = get_setting("min_usd")
-    max_u = get_setting("max_usd")
-    res_u = get_setting("usdt_reserve")
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"🤖 Bot Status: {bot_st} (Click to Toggle)", callback_data="adm_toggle_bot")],
         [InlineKeyboardButton(f"🟣 bKash: {bkash_st}", callback_data="adm_toggle_bkash"),
          InlineKeyboardButton(f"🟠 Nagad: {nagad_st}", callback_data="adm_toggle_nagad")],
         [InlineKeyboardButton(f"🔵 Rocket: {rocket_st}", callback_data="adm_toggle_rocket")],
-        [InlineKeyboardButton(f"🟢 Buy Rate: {buy_r}৳", callback_data="adm_set_buy_rate"),
-         InlineKeyboardButton(f"🔴 Sell Rate: {sell_r}৳", callback_data="adm_set_sell_rate")],
-        [InlineKeyboardButton(f"💎 Reserve: {res_u}$", callback_data="adm_set_reserve")],
-        [InlineKeyboardButton(f"💵 Dollar Min: {get_setting('min_usd')}$", callback_data="adm_set_min_usd"),
-         InlineKeyboardButton(f"💵 Dollar Max: {get_setting('max_usd')}$", callback_data="adm_set_max_usd")],
-        [InlineKeyboardButton(f"💎 Gram Buy Rate: {get_setting('gram_buy_rate')}৳", callback_data="adm_set_gram_buy_rate"),
-         InlineKeyboardButton(f"💎 Gram Sell Rate: {get_setting('gram_sell_rate')}৳", callback_data="adm_set_gram_sell_rate")],
-        [InlineKeyboardButton(f"💎 Gram Reserve: {get_setting('gram_reserve')}", callback_data="adm_set_gram_reserve")],
-        [InlineKeyboardButton(f"💎 Gram Min: {get_setting('gram_min')}", callback_data="adm_set_gram_min"),
-         InlineKeyboardButton(f"💎 Gram Max: {get_setting('gram_max')}", callback_data="adm_set_gram_max")],
         [InlineKeyboardButton("🟣 Set bKash No", callback_data="adm_set_bkash_no"),
          InlineKeyboardButton("🟠 Set Nagad No", callback_data="adm_set_nagad_no")],
         [InlineKeyboardButton("🔵 Set Rocket No", callback_data="adm_set_rocket_no"),
          InlineKeyboardButton("🟡 Set Binance UID", callback_data="adm_set_binance_uid")],
+        [InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="adm_back_admin")],
+    ])
+
+
+def bot_setting_markup() -> InlineKeyboardMarkup:
+    bot_st = "🟢 ON" if get_setting("bot_active") == "1" else "🔴 OFF"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🤖 Bot Status: {bot_st} (Click to Toggle)", callback_data="adm_toggle_bot")],
         [InlineKeyboardButton("📞 Set Support ID", callback_data="adm_set_support"),
          InlineKeyboardButton("📢 Set Notice Text", callback_data="adm_set_notice")],
-        [InlineKeyboardButton("📦 Pending Orders", callback_data="adm_pending_orders"),
-         InlineKeyboardButton("📣 Broadcast Msg", callback_data="adm_broadcast")],
         [InlineKeyboardButton("➕ Add Admin ID", callback_data="adm_add_admin"),
-         InlineKeyboardButton("🔄 Refresh Panel", callback_data="adm_refresh")],
+         InlineKeyboardButton("📣 Broadcast Msg", callback_data="adm_broadcast")],
+        [InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="adm_back_admin")],
     ])
 
 
 def get_admin_dashboard_text() -> str:
     bot_st = "🟢 ACTIVE" if get_setting("bot_active") == "1" else "🔴 OFF (Maintenance)"
-    bkash_st = "🟢 ON" if get_setting("bkash_active") == "1" else "🔴 OFF"
-    nagad_st = "🟢 ON" if get_setting("nagad_active") == "1" else "🔴 OFF"
-    rocket_st = "🟢 ON" if get_setting("rocket_active") == "1" else "🔴 OFF"
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
@@ -346,21 +371,71 @@ def get_admin_dashboard_text() -> str:
         f"🤖 <b>Bot Status:</b> {bot_st}\n"
         f"👥 <b>Total Users:</b> {total_users} | ⏳ <b>Pending:</b> {pending_orders} | ✅ <b>Done:</b> {completed_orders}\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🟢 <b>Buy Rate:</b> <code>{get_setting('buy_rate')} BDT/$</code>\n"
-        f"🔴 <b>Sell Rate:</b> <code>{get_setting('sell_rate')} BDT/$</code>\n"
-        f"💎 <b>USDT Reserve:</b> <code>{get_setting('usdt_reserve')} USDT</code>\n"
-        f"📉 <b>Min Limit:</b> <code>{get_setting('min_usd')} USDT</code>\n"
-        f"📈 <b>Max Limit:</b> <code>{get_setting('max_usd')} USDT</code>\n"
+        "👇 <i>নিচের ৪টা ভাগ থেকে সেটিং করুন:</i>\n"
+        "💵 DOLLAR SETTING | 💎 GRAM SETTING\n"
+        "💳 PAYMENT SYSTEM | 🤖 BOT SETTING"
+    )
+
+
+def get_dollar_setting_text() -> str:
+    return (
+        "💵 <b>DOLLAR SETTING</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "💳 <b>PAYMENT METHODS STATUS & NUMBERS:</b>\n"
+        f"🟢 <b>BUY RET:</b> <code>{get_setting('buy_rate')} BDT/$</code>\n"
+        f"🔴 <b>SELL RET:</b> <code>{get_setting('sell_rate')} BDT/$</code>\n"
+        f"💎 <b>RESERVE:</b> <code>{get_setting('usdt_reserve')} USDT</code>\n"
+        f"🟢 <b>BUY DOLLAR MIN:</b> <code>{get_setting('buy_min')} USDT</code> | <b>MAX:</b> <code>{get_setting('buy_max')} USDT</code>\n"
+        f"🔴 <b>SELL DOLLAR MIN:</b> <code>{get_setting('sell_min')} USDT</code> | <b>MAX:</b> <code>{get_setting('sell_max')} USDT</code>"
+    )
+
+
+def get_gram_setting_text() -> str:
+    return (
+        "💎 <b>GRAM SETTING</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🟢 <b>BUY RET:</b> <code>{get_setting('gram_buy_rate')} BDT/Gram</code>\n"
+        f"🔴 <b>SELL RET:</b> <code>{get_setting('gram_sell_rate')} BDT/Gram</code>\n"
+        f"💎 <b>RESERVE:</b> <code>{get_setting('gram_reserve')} Gram</code>\n"
+        f"🟢 <b>BUY GRAM MIN:</b> <code>{get_setting('gram_buy_min')} Gram</code> | <b>MAX:</b> <code>{get_setting('gram_buy_max')} Gram</code>\n"
+        f"🔴 <b>SELL GRAM MIN:</b> <code>{get_setting('gram_sell_min')} Gram</code> | <b>MAX:</b> <code>{get_setting('gram_sell_max')} Gram</code>"
+    )
+
+
+def get_payment_setting_text() -> str:
+    bkash_st = "🟢 ON" if get_setting("bkash_active") == "1" else "🔴 OFF"
+    nagad_st = "🟢 ON" if get_setting("nagad_active") == "1" else "🔴 OFF"
+    rocket_st = "🟢 ON" if get_setting("rocket_active") == "1" else "🔴 OFF"
+    return (
+        "💳 <b>PAYMENT SYSTEM</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🟣 <b>bKash [{bkash_st}]:</b> <code>{get_setting('bkash_number')}</code>\n"
         f"🟠 <b>Nagad [{nagad_st}]:</b> <code>{get_setting('nagad_number')}</code>\n"
         f"🔵 <b>Rocket [{rocket_st}]:</b> <code>{get_setting('rocket_number')}</code>\n"
-        f"🟡 <b>Binance UID:</b> <code>{get_setting('binance_uid')}</code>\n"
-        f"🟣 <b>Support:</b> {get_setting('support_user')}\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "👇 <i>নিচের রঙিন বাটনগুলোতে ক্লিক করে যেকোনো অপশন ON/OFF বা পরিবর্তন করুন:</i>"
+        f"🟡 <b>Binance UID:</b> <code>{get_setting('binance_uid')}</code>"
     )
+
+
+def get_bot_setting_text() -> str:
+    bot_st = "🟢 ACTIVE" if get_setting("bot_active") == "1" else "🔴 OFF (Maintenance)"
+    return (
+        "🤖 <b>BOT SETTING</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 <b>Bot Status:</b> {bot_st}\n"
+        f"📞 <b>Support:</b> {get_setting('support_user')}\n"
+        f"📢 <b>Notice:</b> {get_setting('notice_text')}"
+    )
+
+
+def _admin_section_view(message_text: str):
+    if "DOLLAR SETTING" in message_text:
+        return get_dollar_setting_text(), dollar_setting_markup()
+    if "GRAM SETTING" in message_text:
+        return get_gram_setting_text(), gram_setting_markup()
+    if "PAYMENT SYSTEM" in message_text:
+        return get_payment_setting_text(), payment_setting_markup()
+    if "BOT SETTING" in message_text:
+        return get_bot_setting_text(), bot_setting_markup()
+    return get_admin_dashboard_text(), admin_panel_inline_markup()
 
 
 def build_rate_card() -> str:
@@ -470,8 +545,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_buy = text == BTN_BUY_GRAM
         order_type = "BUY" if is_buy else "SELL"
         rate = float(get_setting("gram_buy_rate" if is_buy else "gram_sell_rate"))
-        min_usd = float(get_setting("gram_min"))
-        max_usd = float(get_setting("gram_max"))
+        min_usd = float(get_setting("gram_buy_min" if is_buy else "gram_sell_min"))
+        max_usd = float(get_setting("gram_buy_max" if is_buy else "gram_sell_max"))
         reserve = float(get_setting("gram_reserve"))
         user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "GRAM"}
         if is_buy:
@@ -480,7 +555,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💠 <b>আজকের কেনার রেট:</b> <code>{rate} BDT / Gram</code>\n"
                 f"💎 <b>আমাদের রিজার্ভ:</b> <code>{reserve} Gram</code>\n"
-                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} Gram</code>\n\n"
+                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} Gram</code>\n"
+                f"📈 <b>সর্বোচ্চ অর্ডার:</b> <code>{max_usd} Gram</code>\n\n"
                 "✍️ <b>আপনি কত Gram কিনতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 25):</b>"
             )
         else:
@@ -518,8 +594,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_buy = text == BTN_BUY
         order_type = "BUY" if is_buy else "SELL"
         rate = float(get_setting("buy_rate" if is_buy else "sell_rate"))
-        min_usd = float(get_setting("min_usd"))
-        max_usd = float(get_setting("max_usd"))
+        min_usd = float(get_setting("buy_min" if is_buy else "sell_min"))
+        max_usd = float(get_setting("buy_max" if is_buy else "sell_max"))
         reserve = float(get_setting("usdt_reserve"))
         user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "USDT"}
         if is_buy:
@@ -528,7 +604,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💠 <b>আজকের কেনার রেট:</b> <code>{rate} BDT / $1</code>\n"
                 f"💎 <b>আমাদের রিজার্ভ:</b> <code>{reserve} USDT</code>\n"
-                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} USDT</code>\n\n"
+                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} USDT</code>\n"
+                f"📈 <b>সর্বোচ্চ অর্ডার:</b> <code>{max_usd} USDT</code>\n\n"
                 "✍️ <b>আপনি কত ডলার (USDT) কিনতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 25):</b>"
             )
         else:
@@ -622,13 +699,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text("🔴 ❌ অনুগ্রহ করে শুধুমাত্র সংখ্যায় ডলারের পরিমাণ লিখুন (যেমন: 10 বা 25.5):")
             return
         _is_gram = state.get("currency") == "GRAM"
-        min_usd = float(get_setting("gram_min" if _is_gram else "min_usd"))
-        max_usd = float(get_setting("gram_max" if _is_gram else "max_usd"))
+        _is_buy = state.get("order_type") == "BUY"
+        if _is_gram:
+            min_usd = float(get_setting("gram_buy_min" if _is_buy else "gram_sell_min"))
+            max_usd = float(get_setting("gram_buy_max" if _is_buy else "gram_sell_max"))
+        else:
+            min_usd = float(get_setting("buy_min" if _is_buy else "sell_min"))
+            max_usd = float(get_setting("buy_max" if _is_buy else "sell_max"))
         _unit_lbl = "Gram" if _is_gram else "USDT"
         if usd_amount < min_usd:
             await message.reply_text(f"🔴 ⚠️ সর্বনিম্ন অর্ডার পরিমাণ <b>{min_usd} {_unit_lbl}</b>। অনুগ্রহ করে আবার লিখুন:")
             return
-        if state["order_type"] == "SELL" and usd_amount > max_usd:
+        if usd_amount > max_usd:
             await message.reply_text(f"🔴 ⚠️ সর্বোচ্চ অর্ডার পরিমাণ <b>{max_usd} {_unit_lbl}</b>। অনুগ্রহ করে আবার লিখুন:")
             return
         if state["order_type"] == "BUY":
@@ -777,8 +859,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_buy = data == "gram_buy"
         order_type = "BUY" if is_buy else "SELL"
         rate = float(get_setting("gram_buy_rate" if is_buy else "gram_sell_rate"))
-        min_usd = float(get_setting("gram_min"))
-        max_usd = float(get_setting("gram_max"))
+        min_usd = float(get_setting("gram_buy_min" if is_buy else "gram_sell_min"))
+        max_usd = float(get_setting("gram_buy_max" if is_buy else "gram_sell_max"))
         reserve = float(get_setting("gram_reserve"))
         user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "GRAM"}
         if is_buy:
@@ -787,7 +869,8 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💠 <b>আজকের কেনার রেট:</b> <code>{rate} BDT / Gram</code>\n"
                 f"💎 <b>আমাদের রিজার্ভ:</b> <code>{reserve} Gram</code>\n"
-                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} Gram</code>\n\n"
+                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} Gram</code>\n"
+                f"📈 <b>সর্বোচ্চ অর্ডার:</b> <code>{max_usd} Gram</code>\n\n"
                 "✍️ <b>আপনি কত Gram কিনতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 25):</b>"
             )
         else:
@@ -852,35 +935,64 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         set_setting(setting_key, new_val)
         status_label = "🟢 ON" if new_val == "1" else "🔴 OFF"
         await query.answer(f"✅ {label} এখন {status_label} করা হয়েছে!")
-        await query.edit_message_text(get_admin_dashboard_text(), reply_markup=admin_panel_inline_markup())
+        _t, _m = _admin_section_view(query.message.text or "")
+        await query.edit_message_text(_t, reply_markup=_m)
         return
 
     if data == "adm_refresh":
         await query.answer("🔄 Admin Panel আপডেট করা হয়েছে!")
         try:
-            await query.edit_message_text(get_admin_dashboard_text(), reply_markup=admin_panel_inline_markup())
+            _t, _m = _admin_section_view(query.message.text or "")
+            await query.edit_message_text(_t, reply_markup=_m)
         except Exception:
             pass
         return
 
+    if data == "adm_open_dollar":
+        await query.answer()
+        await query.edit_message_text(get_dollar_setting_text(), reply_markup=dollar_setting_markup())
+        return
+    if data == "adm_open_gram":
+        await query.answer()
+        await query.edit_message_text(get_gram_setting_text(), reply_markup=gram_setting_markup())
+        return
+    if data == "adm_open_payment":
+        await query.answer()
+        await query.edit_message_text(get_payment_setting_text(), reply_markup=payment_setting_markup())
+        return
+    if data == "adm_open_bot":
+        await query.answer()
+        await query.edit_message_text(get_bot_setting_text(), reply_markup=bot_setting_markup())
+        return
+    if data == "adm_back_admin":
+        await query.answer()
+        await query.edit_message_text(get_admin_dashboard_text(), reply_markup=admin_panel_inline_markup())
+        return
+    if data == "adm_main_menu":
+        await query.answer()
+        await context.bot.send_message(query.message.chat.id, "মেইন মেনু:", reply_markup=main_menu_keyboard(uid))
+        return
+
     setting_prompts = {
-        "adm_set_buy_rate": ("buy_rate", "🟢 নতুন <b>Buy Rate (BDT)</b> লিখুন (যেমন: 125.5):"),
-        "adm_set_sell_rate": ("sell_rate", "🔴 নতুন <b>Sell Rate (BDT)</b> লিখুন (যেমন: 121.0):"),
-        "adm_set_reserve": ("usdt_reserve", "💎 নতুন <b>USDT Reserve</b> পরিমাণ লিখুন (যেমন: 500):"),
-        "adm_set_min_usd": ("min_usd", "📉 সর্বনিম্ন কত ডলার অর্ডার করা যাবে (<b>Min USD</b>) লিখুন (যেমন: 5):"),
-        "adm_set_max_usd": ("max_usd", "📈 সর্বোচ্চ কত ডলার অর্ডার করা যাবে (<b>Max USD</b>) লিখুন (যেমন: 1000):"),
-        "adm_set_gram_buy_rate": ("gram_buy_rate", "💎 নতুন <b>Gram Buy Rate (BDT)</b> লিখুন (যেমন: 125.5):"),
-        "adm_set_gram_sell_rate": ("gram_sell_rate", "💎 নতুন <b>Gram Sell Rate (BDT)</b> লিখুন (যেমন: 121.0):"),
-        "adm_set_gram_reserve": ("gram_reserve", "💎 নতুন <b>Gram Reserve</b> পরিমাণ লিখুন (যেমন: 500):"),
-        "adm_set_min_usd": ("min_usd", "💵 Dollar-এর সর্বনিম্ন (<b>Dollar Min</b>) লিখুন (যেমন: 5):"),
-        "adm_set_max_usd": ("max_usd", "💵 Dollar-এর সর্বোচ্চ (<b>Dollar Max</b>) লিখুন (যেমন: 1000):"),
-        "adm_set_gram_min": ("gram_min", "💎 Gram-এর সর্বনিম্ন (<b>Gram Min</b>) লিখুন (যেমন: 5):"),
-        "adm_set_gram_max": ("gram_max", "💎 Gram-এর সর্বোচ্চ (<b>Gram Max</b>) লিখুন (যেমন: 1000):"),
+        "adm_set_buy_rate": ("buy_rate", "🟢 নতুন <b>BUY RET (BDT)</b> লিখুন (যেমন: 125.5):"),
+        "adm_set_sell_rate": ("sell_rate", "🔴 নতুন <b>SELL RET (BDT)</b> লিখুন (যেমন: 121.0):"),
+        "adm_set_reserve": ("usdt_reserve", "💎 নতুন <b>RESERVE</b> পরিমাণ লিখুন (যেমন: 500):"),
+        "adm_set_buy_min": ("buy_min", "🟢 <b>BUY DOLLAR MIN</b> লিখুন (যেমন: 5):"),
+        "adm_set_buy_max": ("buy_max", "🟢 <b>BUY DOLLAR MAX</b> লিখুন (যেমন: 1000):"),
+        "adm_set_sell_min": ("sell_min", "🔴 <b>SELL DOLLAR MIN</b> লিখুন (যেমন: 5):"),
+        "adm_set_sell_max": ("sell_max", "🔴 <b>SELL DOLLAR MAX</b> লিখুন (যেমন: 1000):"),
+        "adm_set_gram_buy_rate": ("gram_buy_rate", "💎 নতুন <b>GRAM BUY RET (BDT)</b> লিখুন (যেমন: 125.5):"),
+        "adm_set_gram_sell_rate": ("gram_sell_rate", "💎 নতুন <b>GRAM SELL RET (BDT)</b> লিখুন (যেমন: 121.0):"),
+        "adm_set_gram_reserve": ("gram_reserve", "💎 নতুন <b>GRAM RESERVE</b> পরিমাণ লিখুন (যেমন: 500):"),
+        "adm_set_gram_buy_min": ("gram_buy_min", "💎 <b>BUY GRAM MIN</b> লিখুন (যেমন: 5):"),
+        "adm_set_gram_buy_max": ("gram_buy_max", "💎 <b>BUY GRAM MAX</b> লিখুন (যেমন: 1000):"),
+        "adm_set_gram_sell_min": ("gram_sell_min", "💎 <b>SELL GRAM MIN</b> লিখুন (যেমন: 5):"),
+        "adm_set_gram_sell_max": ("gram_sell_max", "💎 <b>SELL GRAM MAX</b> লিখুন (যেমন: 1000):"),
         "adm_set_bkash_no": ("bkash_number", "🟣 নতুন <b>bKash নাম্বার</b> লিখুন (যেমন: 017XXXXXXXX Personal):"),
         "adm_set_nagad_no": ("nagad_number", "🟠 নতুন <b>Nagad নাম্বার</b> লিখুন (যেমন: 018XXXXXXXX Personal):"),
         "adm_set_rocket_no": ("rocket_number", "🔵 নতুন <b>Rocket নাম্বার</b> লিখুন (যেমন: 019XXXXXXXX Personal):"),
         "adm_set_binance_uid": ("binance_uid", "🟡 নতুন <b>Binance Pay ID / UID</b> লিখুন:"),
-        "adm_set_support": ("support_user", "🟣 নতুন <b>Support Username</b> লিখুন (যেমন: @MySupport):"),
+        "adm_set_support": ("support_user", "📞 নতুন <b>Support Username</b> লিখুন (যেমন: @MySupport):"),
         "adm_set_notice": ("notice_text", "📢 নতুন <b>Notice / ঘোষণা</b> টেক্সট লিখুন:"),
     }
     if data in setting_prompts:
