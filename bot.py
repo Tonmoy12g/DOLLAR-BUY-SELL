@@ -228,8 +228,8 @@ def _mkb(text: str, style: str = "primary") -> KeyboardButton:
 # ====================================================================
 # BUTTON LABELS & KEYBOARDS
 # ====================================================================
-BTN_BUY = "💵 Buy Dollar (USDT)"
-BTN_SELL = "💰 Sell Dollar (USDT)"
+BTN_BUY = "💵 Buy Dollar"
+BTN_SELL = "💰 Sell Dollar"
 BTN_RATE = "📊 Today's Rate"
 BTN_ORDERS = "📜 My Orders"
 BTN_SUPPORT = "👨‍💼 Support"
