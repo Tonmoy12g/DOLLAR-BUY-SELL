@@ -108,6 +108,10 @@ def init_db():
         )
         """
     )
+    try:
+        c.execute("ALTER TABLE orders ADD COLUMN currency TEXT DEFAULT 'USDT'")
+    except Exception:
+        pass
     default_settings = {
         "bot_active": "1",
         "buy_rate": "125.0",
@@ -115,6 +119,9 @@ def init_db():
         "min_usd": "5.0",
         "max_usd": "1000.0",  # Maximum Sell USD (Sell only)
         "usdt_reserve": "500.0",
+        "gram_buy_rate": "125.0",
+        "gram_sell_rate": "121.0",
+        "gram_reserve": "500.0",
         "bkash_active": "1",
         "nagad_active": "1",
         "rocket_active": "1",
@@ -221,11 +228,12 @@ def _mkb(text: str, style: str = "primary") -> KeyboardButton:
 # ====================================================================
 # BUTTON LABELS & KEYBOARDS
 # ====================================================================
-BTN_BUY = "🟢 💵 Buy Dollar (USDT)"
-BTN_SELL = "🔴 💰 Sell Dollar (USDT)"
-BTN_RATE = "🟡 📊 Today's Rate"
-BTN_ORDERS = "🔵 📜 My Orders"
-BTN_SUPPORT = "🟣 👨‍💼 Support"
+BTN_BUY = "💵 Buy Dollar (USDT)"
+BTN_SELL = "💰 Sell Dollar (USDT)"
+BTN_RATE = "📊 Today's Rate"
+BTN_ORDERS = "📜 My Orders"
+BTN_SUPPORT = "👨‍💼 Support"
+BTN_GRAM = "💎 Gram"
 BTN_ADMIN = "⚙️ 👑 Admin Panel"
 BTN_CANCEL = "🔴 ❌ Cancel Action"
 
@@ -236,6 +244,7 @@ def main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     rows = [
         [_mkb(BTN_BUY, "primary"), _mkb(BTN_SELL, "success")],
         [_mkb(BTN_RATE, "primary"), _mkb(BTN_ORDERS, "success")],
+        [_mkb(BTN_GRAM, "success")],
     ]
     if is_admin(user_id):
         rows.append([_mkb(BTN_SUPPORT, "primary"), _mkb(BTN_ADMIN, "primary")])
@@ -284,6 +293,9 @@ def admin_panel_inline_markup() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(f"💎 Reserve: {res_u}$", callback_data="adm_set_reserve"),
          InlineKeyboardButton(f"📉 Min Order: {min_u}$", callback_data="adm_set_min_usd")],
         [InlineKeyboardButton(f"📈 Max Order: {max_u}$", callback_data="adm_set_max_usd")],
+        [InlineKeyboardButton(f"💎 Gram Buy Rate: {get_setting('gram_buy_rate')}৳", callback_data="adm_set_gram_buy_rate"),
+         InlineKeyboardButton(f"💎 Gram Sell Rate: {get_setting('gram_sell_rate')}৳", callback_data="adm_set_gram_sell_rate")],
+        [InlineKeyboardButton(f"💎 Gram Reserve: {get_setting('gram_reserve')}", callback_data="adm_set_gram_reserve")],
         [InlineKeyboardButton("🟣 Set bKash No", callback_data="adm_set_bkash_no"),
          InlineKeyboardButton("🟠 Set Nagad No", callback_data="adm_set_nagad_no")],
         [InlineKeyboardButton("🔵 Set Rocket No", callback_data="adm_set_rocket_no"),
@@ -437,6 +449,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == BTN_ADMIN:
         await cmd_admin(update, context)
         return
+    if text == BTN_GRAM:
+        await message.reply_text(
+            f"💎 <b>Gram Buy / Sell</b>\n\n"
+            f"🟢 Gram Buy Rate: <code>{get_setting('gram_buy_rate')} BDT</code>\n"
+            f"🔴 Gram Sell Rate: <code>{get_setting('gram_sell_rate')} BDT</code>\n"
+            f"💎 Gram Reserve: <code>{get_setting('gram_reserve')} Gram</code>\n\n"
+            "নিচ থেকে Buy Gram নাকি Sell Gram সিলেক্ট করুন:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🟢 Buy Gram", callback_data="gram_buy"),
+                 InlineKeyboardButton("🔴 Sell Gram", callback_data="gram_sell")],
+            ]),
+        )
+        return
     if text in (BTN_BUY, BTN_SELL):
         register_user(message.from_user)
         if get_setting("bot_active") != "1" and not is_admin(uid):
@@ -451,7 +476,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         min_usd = float(get_setting("min_usd"))
         max_usd = float(get_setting("max_usd"))
         reserve = float(get_setting("usdt_reserve"))
-        user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate}
+        user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "USDT"}
         if is_buy:
             prompt = (
                 "🟢 💵 <b>Buy Binance Dollar (USDT)</b>\n"
@@ -466,8 +491,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🔴 💰 <b>Sell Binance Dollar (USDT)</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💠 <b>আজকের বিক্রির রেট:</b> <code>{rate} BDT / $1</code>\n"
-                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} USDT</code>\n"
-                f"📈 <b>সর্বোচ্চ অর্ডার:</b> <code>{max_usd} USDT</code>\n\n"
+                f"📉 Minimum dollar sell: <code>{min_usd} USDT</code>\n"
+                f"📈 Maximum dollar sell: <code>{max_usd} USDT</code>\n\n"
                 "✍️ <b>আপনি কত ডলার (USDT) বিক্রি করতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 50):</b>"
             )
         await message.reply_text(prompt, reply_markup=cancel_keyboard())
@@ -485,7 +510,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if step == "ADMIN_SET_VALUE" and is_admin(uid):
         s_key = state["setting_key"]
-        if s_key in ("buy_rate", "sell_rate", "usdt_reserve", "min_usd", "max_usd"):
+        if s_key in ("buy_rate", "sell_rate", "usdt_reserve", "min_usd", "max_usd", "gram_buy_rate", "gram_sell_rate", "gram_reserve"):
             try:
                 val = float(text)
                 if val <= 0 and s_key != "usdt_reserve":
@@ -560,7 +585,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text(f"🔴 ⚠️ সর্বোচ্চ অর্ডার পরিমাণ <b>{max_usd} USDT</b>। অনুগ্রহ করে আবার লিখুন:")
             return
         if state["order_type"] == "BUY":
-            reserve = float(get_setting("usdt_reserve"))
+            reserve = float(get_setting("gram_reserve" if state.get("currency") == "GRAM" else "usdt_reserve"))
             if usd_amount > reserve:
                 await message.reply_text(f"🔴 ⚠️ আমাদের বর্তমান রিজার্ভ <b>{reserve} USDT</b>। এর সমান বা কম পরিমাণ লিখুন:")
                 return
@@ -569,11 +594,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state["usd_amount"] = usd_amount
         state["bdt_amount"] = bdt_amount
         state["step"] = "SELECT_PAYMENT"
-        type_badge = "🟢 💵 BUY USDT" if state["order_type"] == "BUY" else "🔴 💰 SELL USDT"
+        _unit = state.get("currency", "USDT")
+        type_badge = f"🟢 💵 BUY {_unit}" if state["order_type"] == "BUY" else f"🔴 💰 SELL {_unit}"
         summary = (
             f"<b>{type_badge} — হিসাব বিবরণী</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💵 <b>ডলারের পরিমাণ:</b> <code>{usd_amount} USDT</code>\n"
+            f"💵 <b>পরিমাণ:</b> <code>{usd_amount} {_unit}</code>\n"
             f"📊 <b>রেট:</b> <code>{rate} BDT / $1</code>\n"
             f"💴 <b>মোট টাকার পরিমাণ:</b> <code>{bdt_amount:.2f} BDT</code>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -628,11 +654,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         c = conn.cursor()
         c.execute(
             """
-            INSERT INTO orders (user_id, username, order_type, usd_amount, bdt_amount, rate, payment_method, receive_info, trx_proof, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+            INSERT INTO orders (user_id, username, order_type, usd_amount, bdt_amount, rate, payment_method, receive_info, trx_proof, status, created_at, currency)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
             """,
             (uid, uname, state["order_type"], state["usd_amount"], state["bdt_amount"], state["rate"],
-             state["payment_method"], state["receive_info"], state["trx_proof"], created_at),
+             state["payment_method"], state["receive_info"], state["trx_proof"], created_at, state.get("currency", "USDT")),
         )
         order_id = c.lastrowid
         conn.commit()
@@ -643,8 +669,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🟢 ✅ <b>আপনার অর্ডারটি সফলভাবে জমা হয়েছে!</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🆔 <b>Order ID:</b> <code>#{order_id}</code>\n"
-            f"📌 <b>ধরণ:</b> {order_data['order_type']} USDT\n"
-            f"💵 <b>ডলার:</b> <code>{order_data['usd_amount']} USDT</code>\n"
+            f"📌 <b>ধরণ:</b> {order_data['order_type']} {order_data.get('currency', 'USDT')}\n"
+            f"💵 <b>পরিমাণ:</b> <code>{order_data['usd_amount']} {order_data.get('currency', 'USDT')}</code>\n"
             f"💴 <b>টাকা:</b> <code>{order_data['bdt_amount']:.2f} BDT</code>\n"
             f"📲 <b>মেথড:</b> {order_data['payment_method']}\n"
             f"🧾 <b>প্রুফ/TrxID:</b> <code>{order_data['trx_proof']}</code>\n"
@@ -657,7 +683,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔔 <b>{badge} — #{order_id}</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 <b>User:</b> {uname} (<code>{uid}</code>)\n"
-            f"💵 <b>Amount:</b> <code>{order_data['usd_amount']} USDT</code>\n"
+            f"💵 <b>Amount:</b> <code>{order_data['usd_amount']} {order_data.get('currency', 'USDT')}</code>\n"
             f"💴 <b>Total BDT:</b> <code>{order_data['bdt_amount']:.2f} BDT</code> (Rate: {order_data['rate']})\n"
             f"📲 <b>Method:</b> {order_data['payment_method']}\n"
             f"📥 <b>Receive Info:</b> <code>{order_data['receive_info']}</code>\n"
@@ -692,6 +718,35 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
         await context.bot.send_message(query.message.chat.id, "মেইন মেনু:", reply_markup=main_menu_keyboard(uid))
+        return
+
+    if data in ("gram_buy", "gram_sell"):
+        is_buy = data == "gram_buy"
+        order_type = "BUY" if is_buy else "SELL"
+        rate = float(get_setting("gram_buy_rate" if is_buy else "gram_sell_rate"))
+        min_usd = float(get_setting("min_usd"))
+        max_usd = float(get_setting("max_usd"))
+        reserve = float(get_setting("gram_reserve"))
+        user_states[uid] = {"step": "ENTER_USD_AMOUNT", "order_type": order_type, "rate": rate, "currency": "GRAM"}
+        if is_buy:
+            prompt = (
+                "🟢 💎 <b>Buy Gram</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💠 <b>আজকের কেনার রেট:</b> <code>{rate} BDT / Gram</code>\n"
+                f"💎 <b>আমাদের রিজার্ভ:</b> <code>{reserve} Gram</code>\n"
+                f"📉 <b>সর্বনিম্ন অর্ডার:</b> <code>{min_usd} Gram</code>\n\n"
+                "✍️ <b>আপনি কত Gram কিনতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 25):</b>"
+            )
+        else:
+            prompt = (
+                "🔴 💎 <b>Sell Gram</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💠 <b>আজকের বিক্রির রেট:</b> <code>{rate} BDT / Gram</code>\n"
+                f"📉 Minimum gram sell: <code>{min_usd} Gram</code>\n"
+                f"📈 Maximum gram sell: <code>{max_usd} Gram</code>\n\n"
+                "✍️ <b>আপনি কত Gram বিক্রি করতে চান? সংখ্যায় লিখুন (যেমন: 10 বা 50):</b>"
+            )
+        await context.bot.send_message(query.message.chat.id, prompt, reply_markup=cancel_keyboard())
         return
 
     if data.startswith("paymethod_"):
@@ -761,6 +816,9 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         "adm_set_reserve": ("usdt_reserve", "💎 নতুন <b>USDT Reserve</b> পরিমাণ লিখুন (যেমন: 500):"),
         "adm_set_min_usd": ("min_usd", "📉 সর্বনিম্ন কত ডলার অর্ডার করা যাবে (<b>Min USD</b>) লিখুন (যেমন: 5):"),
         "adm_set_max_usd": ("max_usd", "📈 সর্বোচ্চ কত ডলার অর্ডার করা যাবে (<b>Max USD</b>) লিখুন (যেমন: 1000):"),
+        "adm_set_gram_buy_rate": ("gram_buy_rate", "💎 নতুন <b>Gram Buy Rate (BDT)</b> লিখুন (যেমন: 125.5):"),
+        "adm_set_gram_sell_rate": ("gram_sell_rate", "💎 নতুন <b>Gram Sell Rate (BDT)</b> লিখুন (যেমন: 121.0):"),
+        "adm_set_gram_reserve": ("gram_reserve", "💎 নতুন <b>Gram Reserve</b> পরিমাণ লিখুন (যেমন: 500):"),
         "adm_set_bkash_no": ("bkash_number", "🟣 নতুন <b>bKash নাম্বার</b> লিখুন (যেমন: 017XXXXXXXX Personal):"),
         "adm_set_nagad_no": ("nagad_number", "🟠 নতুন <b>Nagad নাম্বার</b> লিখুন (যেমন: 018XXXXXXXX Personal):"),
         "adm_set_rocket_no": ("rocket_number", "🔵 নতুন <b>Rocket নাম্বার</b> লিখুন (যেমন: 019XXXXXXXX Personal):"),
@@ -831,16 +889,27 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         order_id = int(parts[3])
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute(
-            "SELECT user_id, order_type, usd_amount, bdt_amount, payment_method, status FROM orders WHERE order_id = ?",
-            (order_id,),
-        )
-        row = c.fetchone()
-        if not row:
+        try:
+            c.execute(
+                "SELECT user_id, order_type, usd_amount, bdt_amount, payment_method, status, currency FROM orders WHERE order_id = ?",
+                (order_id,),
+            )
+            _r = c.fetchone()
+            if _r and len(_r) == 7:
+                o_uid, otype, usd, bdt, pm, current_st, _cur = _r
+            else:
+                raise ValueError("no currency")
+        except Exception:
+            c.execute(
+                "SELECT user_id, order_type, usd_amount, bdt_amount, payment_method, status FROM orders WHERE order_id = ?",
+                (order_id,),
+            )
+            o_uid, otype, usd, bdt, pm, current_st = c.fetchone()
+            _cur = "USDT"
+        if o_uid is None:
             conn.close()
             await query.answer("⚠️ অর্ডারটি পাওয়া যায়নি!", show_alert=True)
             return
-        o_uid, otype, usd, bdt, pm, current_st = row
         if current_st != "PENDING":
             conn.close()
             await query.answer(f"⚠️ এই অর্ডারটি আগেই {current_st} করা হয়েছে!", show_alert=True)
@@ -851,14 +920,16 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         conn.close()
         if new_status == "APPROVED" and otype == "BUY":
             try:
-                cur_res = float(get_setting("usdt_reserve"))
-                set_setting("usdt_reserve", f"{max(0.0, cur_res - float(usd)):.2f}")
+                _rk = "gram_reserve" if _cur == "GRAM" else "usdt_reserve"
+                cur_res = float(get_setting(_rk))
+                set_setting(_rk, f"{max(0.0, cur_res - float(usd)):.2f}")
             except Exception:
                 pass
         elif new_status == "APPROVED" and otype == "SELL":
             try:
-                cur_res = float(get_setting("usdt_reserve"))
-                set_setting("usdt_reserve", f"{cur_res + float(usd):.2f}")
+                _rk = "gram_reserve" if _cur == "GRAM" else "usdt_reserve"
+                cur_res = float(get_setting(_rk))
+                set_setting(_rk, f"{cur_res + float(usd):.2f}")
             except Exception:
                 pass
         badge_text = "🟢 ✅ APPROVED (সম্পন্ন)" if new_status == "APPROVED" else "🔴 ❌ REJECTED (বাতিল)"
