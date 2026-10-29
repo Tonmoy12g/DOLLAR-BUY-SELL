@@ -449,6 +449,10 @@ def build_rate_card() -> str:
         f"🔴 <b>💰 Sell USDT Rate:</b> <code>{get_setting('sell_rate')} টাকা / $1</code>\n"
         f"💎 <b>Available Reserve:</b> <code>{get_setting('usdt_reserve')} USDT</code>\n"
         f"📉 <b>Minimum Order:</b> <code>{get_setting('min_usd')} USDT</code>\n"
+        f"💎 <b>Gram Buy Rate:</b> <code>{get_setting('gram_buy_rate')} টাকা / Gram</code>\n"
+        f"💎 <b>Gram Sell Rate:</b> <code>{get_setting('gram_sell_rate')} টাকা / Gram</code>\n"
+        f"💎 <b>Gram Reserve:</b> <code>{get_setting('gram_reserve')} Gram</code>\n"
+        f"💎 <b>Gram Minimum Order:</b> <code>{get_setting('gram_buy_min')} Gram</code>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "📲 <b>সক্রিয় পেমেন্ট মেথডসমূহ:</b>\n"
         f"🟣 <b>bKash:</b> {bk}\n"
@@ -471,7 +475,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📢 <b>নোটিশ:</b> {get_setting('notice_text')}\n\n"
         f"🟢 <b>ডলার কেনার রেট (Buy):</b> <code>{get_setting('buy_rate')} BDT</code>\n"
         f"🔴 <b>ডলার বিক্রির রেট (Sell):</b> <code>{get_setting('sell_rate')} BDT</code>\n"
-        f"💎 <b>আমাদের রিজার্ভ:</b> <code>{get_setting('usdt_reserve')} USDT</code>\n\n"
+        f"💎 <b>আমাদের রিজার্ভ:</b> <code>{get_setting('usdt_reserve')} USDT</code>\n"
+        f"💎 <b>Gram কেনার রেট (Buy):</b> <code>{get_setting('gram_buy_rate')} BDT</code>\n"
+        f"💎 <b>Gram বিক্রির রেট (Sell):</b> <code>{get_setting('gram_sell_rate')} BDT</code>\n"
+        f"💎 <b>Gram রিজার্ভ:</b> <code>{get_setting('gram_reserve')} Gram</code>\n\n"
         "👇 <b>লেনদেন শুরু করতে নিচের রঙিন বাটন ব্যবহার করুন:</b>"
     )
     await update.message.reply_text(welcome_text, reply_markup=main_menu_keyboard(update.effective_user.id))
